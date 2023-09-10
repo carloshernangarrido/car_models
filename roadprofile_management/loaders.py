@@ -32,7 +32,8 @@ class Road:
             fig.update_layout(scene=dict(xaxis_title='X', yaxis_title='Y', zaxis_title='Z'))  # Add labels
             fig.show()  # Show the plot
 
-    def get_profile(self, lane: float = 2, tol: float = 0.1, plot: bool = False, resample: bool = True):
+    def get_profile(self, lane: float = 2, tol: float = 0.1, plot: bool = False, resample: bool = True,
+                    remove_mean: bool = True):
         data_ = self.data[(lane - tol < self.data[:, 0]) & (self.data[:, 0] < lane + tol), :]
         # Extract unique values of y from the data
         unique_y = np.unique(data_[:, 1])
@@ -49,6 +50,8 @@ class Road:
                                                              bounds_error=False, fill_value="extrapolate")
             position = np.linspace(position[0], position[-1], len(position))
             height = interpolation_function(position)
+        if remove_mean:
+            height = height - np.mean(height)
         if plot:
             # Create a 2x1 subplot layout
             fig = make_subplots(rows=2, cols=1)

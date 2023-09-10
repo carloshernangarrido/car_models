@@ -51,7 +51,7 @@ class Converter:
     def speed_th2height_th(self, speed_th):
         return self.position_th2height_th(self.speed_th2position_th(speed_th))
 
-    def speed_th2roadvertacc_th(self, speed_th):
+    def speed_th2roadvertacc_th(self, speed_th, smooth_time_window: float = 0.01):
         assert self.new_t_vector is not None
         roadvertvel_th = np.zeros((self.new_t_vector.shape[0], 2))
         roadvertvel_th[:, 0] = self.new_t_vector
@@ -61,4 +61,19 @@ class Converter:
         roadvertacc_th[:, 0] = self.new_t_vector
         roadvertacc_th[0:-1, 1] = np.diff(roadvertvel_th[:, 1]) / np.diff(roadvertvel_th[:, 0])
         roadvertacc_th[-1, 1] = roadvertacc_th[-2, 1]
+
+        if smooth_time_window != 0:
+            assert smooth_time_window > 0
+            # Calculate the corresponding number of data points for the window
+            sampling_rate = len(roadvertacc_th[:, 0]) / (roadvertacc_th[:, 0][-1] - roadvertacc_th[:, 0][0])
+            window_length = int(smooth_time_window * sampling_rate)
+            # Ensure that the window length is odd
+            if window_length % 2 == 0:
+                window_length += 1
+            # Perform smoothing
+            interpolation_function = sp.interpolate.interp1d(
+                roadvertacc_th[0:-1:window_length, 0], roadvertacc_th[0:-1:window_length, 1], kind='cubic',
+                bounds_error=False, fill_value="extrapolate")
+            roadvertacc_th[:, 1] = interpolation_function(roadvertacc_th[:, 0])
+
         return roadvertacc_th
