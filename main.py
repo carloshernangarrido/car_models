@@ -27,6 +27,7 @@ if __name__ == "__main__":
 
     plot_modelresults_timedomain(t_vector, roadvertheight, roadvertacc, model, show=False)
     plot_modelresults_frequencydomain(t_vector, roadvertheight, roadvertacc, model, show=False)
-    plot_modelresults_timefrequencydomain(t_vector, roadvertheight, roadvertacc, model, batch_length_s=70, show=False)
+    plot_modelresults_timefrequencydomain(t_vector, roadvertheight, roadvertacc, model, batch_length_s=10, show=False,
+                                          smoothing_window_Hz=1)
     plt.show()
     ...
