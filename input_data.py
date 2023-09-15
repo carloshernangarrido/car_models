@@ -11,6 +11,6 @@ m_u = 80  # Unsprung mass
 
 roaddata_folder = r'C:\TRABAJO\CONICET\datasets\A 3D road surface topography\RoadData'
 
-speed_descr = SpeedDescriber(t_accel=20, t_const=40, t_decel=10.1, max_speed=10)
+speed_descr = SpeedDescriber(t_accel=20, t_const=50, t_decel=10.1, max_speed=20)
 delta_t = 0.001
 

@@ -5,7 +5,7 @@ from roadprofile_management import converters
 from roadprofile_management.loaders import Road, SpeedDescriber
 
 
-def get_roadvertacc(loader: Road, speed_descr: SpeedDescriber, t_vector: np.ndarray, plot: bool = False):
+def get_roadvertaccheight(loader: Road, speed_descr: SpeedDescriber, t_vector: np.ndarray, plot: bool = False):
     position_height = loader.get_profile(tol=.2, lane=1, plot=False)
     converter = converters.Converter(position_height, new_t_vector=t_vector)
     speed_th = np.array([[0, 0],
