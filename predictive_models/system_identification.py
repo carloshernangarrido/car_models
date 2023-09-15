@@ -32,31 +32,36 @@ def batch_extractor(time: np.ndarray, response: np.ndarray, batch_length_s: floa
 
 class CustomConv1D(tf.keras.layers.Layer):
     def __init__(self, kernel_size: int, activation: Union[None, str, Callable], use_bias: bool = False,
-                 padding: str = "VALID", stride: int = 1, kernel_duration: Union[float, None] = None, **kwargs):
+                 padding: str = "VALID", stride: int = 1, **kwargs):
         self.kernel_size = kernel_size
-        self.kernel_duration = kernel_duration
         self.use_bias = use_bias
         self.activation = 'linear' if activation is None else activation
         self.padding = padding
         self.stride = stride
         # trainable parameters
-        self.omega, self.phi, self.lambda_, self.amplitude, self.bias = None, None, None, None, None
+        self.omega, self.phi, self.zeta, self.amplitude, self.bias = None, None, None, None, None
         # generated kernel
         self.kernel = None
         # misc
-        if self.kernel_duration is None:
-            self.t = tf.cast(tf.linspace(0, self.kernel_size, self.kernel_size), tf.float32)
-        else:
-            self.t = tf.cast(tf.linspace(0, self.kernel_duration, self.kernel_size), tf.float32)
+        self.t = tf.cast(tf.linspace(0, self.kernel_size, self.kernel_size), tf.float32)
         super(CustomConv1D, self).__init__(**kwargs)
 
     def build(self, input_shape):
         # trainable parameters
+        # Define constraints for amplitude, omega, phi, and zeta
+        amplitude_constraint = tf.keras.constraints.NonNeg()
+        omega_constraint = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=np.pi)
+        phi_constraint = tf.keras.constraints.MinMaxNorm(min_value=-np.pi/2, max_value=np.pi/2)
+        zeta_constraint = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=1.0)
         self.omega = self.add_weight(name='omega', shape=(1,), initializer='random_normal', dtype='float32',
-                                     trainable=True)
-        self.phi = self.add_weight(name='phi', shape=(1,), initializer='random_normal', dtype='float32', trainable=True)
-        self.lambda_ = self.add_weight(name='lambda_', shape=(1,), initializer='zeros', dtype='float32', trainable=True)
-        self.amplitude = self.add_weight(name='amplitude', shape=(1,), initializer='ones', dtype='float32', trainable=True)
+                                     trainable=True, constraint=omega_constraint)
+        self.phi = self.add_weight(name='phi', shape=(1,), initializer='random_normal', dtype='float32', trainable=True,
+                                   constraint=phi_constraint)
+        self.zeta = self.add_weight(name='zeta', shape=(1,), initializer='zeros', dtype='float32',
+                                    trainable=True, constraint=zeta_constraint)
+        self.amplitude = self.add_weight(name='amplitude', shape=(1,), initializer='random_normal', dtype='float32',
+                                         trainable=True, constraint=amplitude_constraint)
+
         # generated kernel
         self.kernel = self.add_weight(name='kernel', shape=[self.kernel_size, 1, 1], initializer='ones', dtype='float32',
                                       trainable=False)
@@ -66,10 +71,10 @@ class CustomConv1D(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         if kwargs['training'] is True:  # Training mode
             ...
-        kernel = tf.reshape(self.amplitude * tf.math.sin(self.omega * self.t + self.phi) *
-                            tf.math.exp(self.lambda_ * self.t), (self.kernel_size, 1, 1))
+        kernel = tf.reshape(self.amplitude * tf.math.cos(self.omega * self.t + self.phi) *
+                            tf.math.exp(- self.zeta * self.omega * self.t), (self.kernel_size, 1, 1))
         self.kernel.assign(kernel)
-        z = tf.nn.conv1d(input=inputs, filters=kernel, stride=self.stride, padding=self.padding)
+        z = tf.nn.conv1d(input=inputs, filters=tf.reverse(kernel, axis=[0]), stride=self.stride, padding=self.padding)
         if self.use_bias:
             z += self.bias
         if self.activation == 'linear':
@@ -98,8 +103,7 @@ def cardynamics_identification(t_vector, roadvert, carbodyvert, plot: bool = Fal
     # model.add(Conv1D(filters=1, kernel_size=kernel_size, use_bias=False, activation='linear',
     #                  input_shape=(x_train[0].shape[0], 1)))
     model.add(CustomConv1D(kernel_size=kernel_size, use_bias=True, activation='linear',
-                           input_shape=(x_train[0].shape[0], 1),
-                           kernel_duration=kernel_size*(x_time_batches[0][1] - x_time_batches[0][0])))
+                           input_shape=(x_train[0].shape[0], 1)))
     model.compile(optimizer='adam', loss='mean_squared_error')
     # # Print the model summary
     model.summary()
