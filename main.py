@@ -8,6 +8,7 @@ from models.chain_like import Mesh, Constraint, Model, Load
 from visualization.ploting_results import plot_modelresults_timedomain, plot_modelresults_frequencydomain, \
     plot_modelresults_timefrequencydomain, modelsol2meas
 
+
 if __name__ == "__main__":
     from input_data import k_s, c_s, m_s, k_t, c_t, m_u, roaddata_folder, speed_descr, delta_t
 
