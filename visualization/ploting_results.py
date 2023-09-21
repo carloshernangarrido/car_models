@@ -3,12 +3,13 @@ import numpy as np
 import scipy as sp
 
 
-def modelsol2meas(model, roadvertacc, roadvertheight):
+def modelsol2meas(model, roadvertacc, roadvertheight, timesteps_skip=1):
     wheelvertacc = roadvertacc + model.accelerations(1, append=0)
     carbodyvertacc = roadvertacc + model.accelerations(2, append=0)
     wheelvertheight = roadvertheight + model.displacements(1)
     carbodyvertheight = roadvertheight + model.displacements(2)
-    return wheelvertacc, carbodyvertacc, wheelvertheight, carbodyvertheight
+    return wheelvertacc[0::timesteps_skip], carbodyvertacc[0::timesteps_skip], \
+           wheelvertheight[0::timesteps_skip], carbodyvertheight[0::timesteps_skip]
 
 
 def plot_modelresults_timedomain(t_vector, roadvertheight, roadvertacc, model, show: bool = True):
