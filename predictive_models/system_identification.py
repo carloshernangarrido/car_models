@@ -8,7 +8,9 @@ from keras import regularizers, Input
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-from keras.src.layers import Conv1D, Lambda, Layer
+from keras.src.layers import Conv1D, Lambda, Layer, Conv1DTranspose, Dense, Flatten
+
+from predictive_models.loss_functions import same_road_loss, SameRoadLossSimple
 
 
 def batch_extractor(time: np.ndarray, response: np.ndarray, batch_length_s: float, ret_time_batches: bool = False,
@@ -42,7 +44,11 @@ def batch_extractor(time: np.ndarray, response: np.ndarray, batch_length_s: floa
 
 class CarDynamicsIdentification:
     def __init__(self, t_vector, roadvert, carbodyvert, kernel_length_s: float = 5.0,
-                 batch_length_s: int = 10, timesteps_skip: int = 1, plot: bool = False):
+                 batch_length_s: float = 10.0, timesteps_skip: int = 1, plot: bool = False, normalize: bool = False,
+                 learning_rate: float = 0.01, epochs: int = 50):
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.normalize = normalize
         self.plot = plot
         self.timesteps_skip = timesteps_skip
         self.batch_length_s = batch_length_s
@@ -53,7 +59,7 @@ class CarDynamicsIdentification:
         self.kernel_size = int(kernel_length_s / self.delta_t)
         self.direct_x_train, self.direct_y_train, self.direct_y_pred, self.direct_model = None, None, None, None
         self.inverse_x_train, self.inverse_y_train, self.inverse_y_pred, self.inverse_model = None, None, None, None
-        self.inverse_x_scale, self.inverse_y_scale, self.direct_x_scale, self.direct_y_scale = None, None, None, None
+        self.inverse_x_scale, self.inverse_y_scale, self.direct_x_scale, self.direct_y_scale = 1, 1, 1, 1
 
     def direct_identification(self, kernel_regularizer=None, plot: Union[bool, None] = None, samples_to_plot: int = 5,
                               fit: bool = True):
@@ -69,7 +75,8 @@ class CarDynamicsIdentification:
         x_train, x_time_batches = np.array(x_train), np.array(x_time_batches)
         y_full_train, y_full_time_batches = np.array(y_full_train), np.array(y_full_time_batches)
 
-        self.direct_x_scale, self.direct_y_scale = np.max(x_train), np.max(y_full_train)
+        if self.normalize:
+            self.direct_x_scale, self.direct_y_scale = np.max(x_train), np.max(y_full_train)
         x_train, y_full_train = x_train / self.direct_x_scale, y_full_train / self.direct_y_scale
 
         y_train = y_full_train[:, self.kernel_size - 1:]
@@ -80,9 +87,9 @@ class CarDynamicsIdentification:
             model.add(Normalization(input_shape=(x_train[0].shape[0], 1)))
             model.add(Conv1D(filters=1, kernel_size=self.kernel_size, use_bias=False, activation='linear',
                              input_shape=(x_train[0].shape[0], 1), kernel_regularizer=kernel_regularizer))
-            model.compile(optimizer=Adam(learning_rate=0.1), loss='mean_squared_error')
+            model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mean_squared_error')
             model.summary()
-            model.fit(x_train, y_train, epochs=20, validation_split=0.1)
+            model.fit(x_train, y_train, epochs=self.epochs, validation_split=0.1)
             self.direct_model = model
         self.direct_x_train = x_train * self.direct_x_scale
         self.direct_y_train = y_train * self.direct_y_scale
@@ -114,22 +121,40 @@ class CarDynamicsIdentification:
             batch_extractor(self.t_vector[0::self.timesteps_skip], self.roadvert[0::self.timesteps_skip],
                             self.batch_length_s, runing=True, ret_time_batches=True)
 
-        x_train, x_time_batches = np.array(x_train), np.array(x_time_batches)
+        x_full_train, x_full_time_batches = np.array(x_train), np.array(x_time_batches)
         y_full_train, y_full_time_batches = np.array(y_full_train), np.array(y_full_time_batches)
 
-        self.inverse_x_scale, self.inverse_y_scale = np.max(x_train), np.max(y_full_train)
-        x_train, y_full_train = x_train / self.inverse_x_scale, y_full_train / self.inverse_y_scale
+        if self.normalize:
+            self.inverse_x_scale, self.inverse_y_scale = np.max(x_train), np.max(y_full_train)
+        x_full_train, y_full_train = x_full_train / self.inverse_x_scale, y_full_train / self.inverse_y_scale
+
+        # assuming Conv1D
+        x_train = x_full_train
         y_train = y_full_train[:, 0:-self.kernel_size + 1]
         y_time_batches = [_[0:-self.kernel_size + 1] for _ in y_full_time_batches]
+
+        # assuming Conv1DTranspose
+        # x_train = x_full_train[:, self.kernel_size - 1:]
+        # x_time_batches = [_[self.kernel_size - 1:] for _ in x_full_time_batches]
+        # y_train = y_full_train
+        # y_time_batches = y_full_time_batches
+
+        # assuming Dense
+        # x_train = x_full_train
+        # y_train = y_full_train[:, 0:-self.kernel_size + 1]
+        # y_time_batches = [_[0:-self.kernel_size + 1] for _ in y_full_time_batches]
 
         if fit:
             model = Sequential()
             model.add(Normalization(input_shape=(x_train[0].shape[0], 1)))
             model.add(Conv1D(filters=1, kernel_size=self.kernel_size, use_bias=False, activation='linear',
                              input_shape=(x_train[0].shape[0], 1), kernel_regularizer=kernel_regularizer))
-            model.compile(optimizer=Adam(learning_rate=0.1), loss='mean_squared_error')
+            # model.add(Conv1DTranspose(filters=1, kernel_size=self.kernel_size, use_bias=False, activation='linear',
+            #                           input_shape=(x_train[0].shape[0], 1), kernel_regularizer=kernel_regularizer))
+            # model.add(Dense(units=y_train[0].shape[0], activation='relu'))
+            model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss='mean_squared_error')
             model.summary()
-            model.fit(x_train, y_train, epochs=20, validation_split=0.1)
+            model.fit(x_train, y_train, epochs=self.epochs, validation_split=0.1)
             self.inverse_model = model
         self.inverse_x_train = x_train * self.inverse_x_scale
         self.inverse_y_train = y_train * self.inverse_y_scale
@@ -154,13 +179,14 @@ class CarDynamicsIdentification:
 
 class JointIdentification:
     def __init__(self, x11, x12, x21, x22, time,
-                 kernel_length_s: float = 5.0, batch_length_s: int = 10, learning_rate=0.001):
+                 kernel_length_s: float = 5.0, batch_length_s: int = 10, learning_rate=0.001, epochs: int = 10):
         """
         :param x11: measurement with car 1 on road 1
         :param x12: measurement with car 1 on road 2
         :param x21: measurement with car 2 on road 1
         :param x22: measurement with car 2 on road 2
         """
+        self.epochs = epochs
         self.learning_rate = learning_rate
         self.x11 = x11
         self.x12 = x12
@@ -213,19 +239,6 @@ class JointIdentification:
         model = tf.keras.models.Model(inputs=[input11, input12, input21, input22],
                                       outputs=[conv11, conv12, conv21, conv22])
 
-        # Custom loss function for enforcing the "same road"
-        def same_road_loss(y_true, y_pred):
-            # Extract conv11 and conv21 from y_pred
-            conv11 = y_pred[0]
-            conv12 = y_pred[1]
-            conv21 = y_pred[2]
-            conv22 = y_pred[3]
-            # Calculate the squared difference between estimations of the same road
-            squared_diff_road1 = tf.square(conv11 - conv21)
-            squared_diff_road2 = tf.square(conv12 - conv22)
-            # Compute the mean squared difference
-            return tf.reduce_mean(squared_diff_road1) + tf.reduce_mean(squared_diff_road2)
-
         # Compile the model and specify loss and optimizer as needed
         model.compile(optimizer=Adam(learning_rate=self.learning_rate), loss=same_road_loss)
 
@@ -235,7 +248,8 @@ class JointIdentification:
 
     def fit_model(self):
         self.model.fit([self.x11_train, self.x12_train, self.x21_train, self.x22_train],
-                       [self.y11_train, self.y12_train, self.y21_train, self.y22_train], epochs=20, validation_split=0.1)
+                       [self.y11_train, self.y12_train, self.y21_train, self.y22_train],
+                       epochs=self.epochs, validation_split=0.1)
 
     def predict(self, x11=None, x12=None, x21=None, x22=None):
         if x11 is not None:
@@ -257,3 +271,75 @@ class JointIdentification:
 
         return self.model.predict([self.x11_train, self.x12_train, self.x21_train, self.x22_train])
 
+
+class JointIdentificationSimple:
+    def __init__(self, x1, x2, time,
+                 kernel_length_s: float = 5.0, batch_length_s: int = 10, learning_rate=0.001, epochs: int = 10,
+                 amplitude_regularization: float = 1.0):
+        """
+        :param x1: measurement with car 1
+        :param x2: measurement with car 2
+        """
+        self.amplitude_regularization = amplitude_regularization
+        self.epochs = epochs
+        self.learning_rate = learning_rate
+        self.x1 = x1
+        self.x2 = x2
+        self.time = time
+        self.kernel_length_s = kernel_length_s
+        self.batch_length_s = batch_length_s
+        self.delta_t = time[1] - time[0]
+        self.kernel_size = int(kernel_length_s / self.delta_t)
+
+        self.model = None  # To be created in other methods
+
+        self.x1_train, self.x1_time_batches = batch_extractor(self.time, self.x1, self.batch_length_s, runing=True,
+                                                              ret_time_batches=True, as_nparray=True)
+        self.x2_train, self.x2_time_batches = batch_extractor(self.time, self.x2, self.batch_length_s, runing=True,
+                                                              ret_time_batches=True, as_nparray=True)
+
+        self.y1_train = np.zeros(self.x1_train.shape)
+        self.y2_train = np.zeros(self.x2_train.shape)
+
+        self.batch_size = self.x1_train.shape[1]
+        self.input_shape = (self.batch_size, 1)
+
+    def build_model(self):
+        # Define the input tensors
+        input1 = Input(shape=self.input_shape)
+        input2 = Input(shape=self.input_shape)
+
+        # Apply shared Conv1D layers to each element of the input tensor
+        conv1 = Conv1D(filters=1, use_bias=False, kernel_size=self.kernel_size,
+                       activation='linear', padding='valid')(input1)
+        conv2 = Conv1D(filters=1, use_bias=False, kernel_size=self.kernel_size,
+                       activation='linear', padding='valid')(input2)
+
+        # Create the model
+        model = tf.keras.models.Model(inputs=[input1, input2],
+                                      outputs=[conv1, conv2])
+
+        # Compile the model and specify loss and optimizer as needed
+        model.compile(optimizer=Adam(learning_rate=self.learning_rate),
+                      loss=SameRoadLossSimple(amplitude_regularization=self.amplitude_regularization))
+
+        # Print model summary
+        model.summary()
+        self.model = model
+
+    def fit_model(self):
+        self.model.fit([self.x1_train, self.x2_train], [self.y1_train, self.y2_train],
+                       epochs=self.epochs, validation_split=0.1,
+                       callbacks=[SameRoadLossCallback(x_val=[self.x1_train, self.x2_train],
+                                                       amplitude_regularization=self.amplitude_regularization)])
+
+    def predict(self, x1=None, x2=None):
+        if x1 is not None:
+            self.x1 = x1
+            self.x1_train, self.x1_time_batches = batch_extractor(self.time, self.x1, self.batch_length_s,
+                                                                  runing=True, ret_time_batches=True, as_nparray=True)
+        if x2 is not None:
+            self.x2 = x2
+            self.x2_train, self.x2_time_batches = batch_extractor(self.time, self.x2, self.batch_length_s,
+                                                                  runing=True, ret_time_batches=True, as_nparray=True)
+        return self.model.predict([self.x1_train, self.x2_train])
