@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
         # Simulations
         models = []
-        for m_s_var in [0.5, 1.0, 1.5]:
+        for m_s_var in [1.5, 1.0, 0.5]:
             model_roads = []
             for roadvertacc_ in roadvertaccs:
                 m_s_ = m_s_var * m_s
@@ -45,7 +45,7 @@ if __name__ == "__main__":
                 mesh.fill_elements('k', [k_t, k_s])
                 mesh.fill_elements('c', [c_t, c_s])
                 const = Constraint(dof_s=0)
-                model = Model(mesh=mesh, constraints=const, lumped_masses=[1, m_u, m_s], loads=[load_u, load_s],
+                model = Model(mesh=mesh, constraints=const, lumped_masses=[1, m_u, m_s_], loads=[load_u, load_s],
                               options={'t_vector': t_vector, 'method': 'RK23'})
                 model.linearize()
                 model.lsim()
