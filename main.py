@@ -108,7 +108,36 @@ if __name__ == "__main__":
     plt.xlabel('frequency (Hz)')
     plt.legend()
 
-    # Spectrograms
+
+    # Spectrograms Linear scale
+    f = np.linspace(1, 49, 49)  # Valores de x de 1 a 49 # Crear una matriz que represente la hiperbola y = 1/x
+    diff_fd = f**2
+    acc_spectrogram_road = eq_l.y_train_fd * diff_fd
+    vmin, vmax = np.min(acc_spectrogram_road), np.max(acc_spectrogram_road)
+    fig_road = plt.figure()
+    cax_road = plt.imshow(acc_spectrogram_road, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    cbar_road = fig_road.colorbar(cax_road)
+    plt.title('acc. spectrogram of the actual road')
+
+    acc_car1, acc_car2 = eq_l.x1_train_fd, eq_l.x2_train_fd
+    vmin, vmax = np.min(np.min((acc_car1, acc_car2))), np.max(np.max((acc_car1, acc_car2)))
+    fig_, ax = plt.subplots(1, 2)
+    ax[0].imshow(acc_car1, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0].set_title('acc. at car 1')
+    ax[1].imshow(acc_car2, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1].set_title('acc. at car 2')
+
+    # Plot prediction
+    y_pred = eq_l.predict()
+    fig_, ax = plt.subplots(1, 2)
+    vmin, vmax = np.min(np.min(y_pred)), np.max(np.max(y_pred))
+    ax[0].imshow(y_pred[0], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0].set_title('equalized acc. at car 1')
+    ax[1].imshow(y_pred[1], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1].set_title('equalized acc. at car 2')
+    plt.show()
+
+    # Spectrograms Log scale
     f = np.linspace(1, 49, 49)  # Valores de x de 1 a 49 # Crear una matriz que represente la hiperbola y = 1/x
     diff_fd = f**2
     acc_spectrogram_road = eq_l.y_train_fd * diff_fd
