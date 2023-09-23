@@ -34,7 +34,7 @@ class SOSConv1D(tf.keras.layers.Layer):
         amplitude_constraint = tf.keras.constraints.NonNeg()
         omega_constraint = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=np.pi)
         phi_constraint = tf.keras.constraints.MinMaxNorm(min_value=-np.pi / 2, max_value=np.pi / 2)
-        zeta_constraint = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=1.0).__call__
+        zeta_constraint = tf.keras.constraints.MinMaxNorm(min_value=0.0, max_value=1.0)
         self.omega = self.add_weight(name='omega', shape=(self.sos_num,), initializer='random_normal',
                                      dtype='float32',
                                      trainable=True, constraint=omega_constraint)
@@ -71,3 +71,22 @@ class SOSConv1D(tf.keras.layers.Layer):
             return tf.keras.activations.linear(z)
         else:
             return self.activation(z)
+
+
+class DiagonalDense(tf.keras.layers.Layer):
+    def __init__(self, units, kernel_initializer, **kwargs):
+        self.kernel_initializer = kernel_initializer
+        self.kernel = None
+        self.units = units
+        super(DiagonalDense, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # Create a diagonal weight matrix with ones on the diagonal
+        self.kernel = self.add_weight("kernel", shape=(self.units, ), initializer=self.kernel_initializer, trainable=True,
+                                      constraint=tf.keras.constraints.NonNeg())
+
+    def call(self, inputs, **kwargs):
+        # Apply the diagonal weight matrix and ensure the output has the same shape as the input
+        z = self.kernel * inputs
+        return z
+

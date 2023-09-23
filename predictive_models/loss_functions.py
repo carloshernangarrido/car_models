@@ -43,7 +43,7 @@ class SameRoadLossSimple:
     def __call__(self, y_true, y_pred, *args, **kwargs):
         # Compute the mean squared difference between the two predicted outputs
         shape_loss = tf.reduce_mean(tf.square(y_pred[0] - y_pred[1]))
-        amplitude_loss = tf.abs(tf.reduce_mean(tf.square(y_pred[0])) - tf.reduce_mean(tf.square(y_pred[1])))
+        amplitude_loss = -tf.reduce_min(y_pred)
         return shape_loss + self.amplitude_regularization * amplitude_loss
 
 
@@ -62,7 +62,7 @@ class SameRoadLossCallback(tf.keras.callbacks.Callback):
 
         # Calculate the loss terms
         shape_loss = tf.reduce_mean(tf.square(y_pred[0] - y_pred[1]))
-        amplitude_loss = tf.abs(tf.reduce_mean(tf.square(y_pred[0])) - tf.reduce_mean(tf.square(y_pred[1])))
+        amplitude_loss = -tf.reduce_min(y_pred)
 
         # Calculate the total loss
         total_loss = shape_loss + self.amplitude_regularization * amplitude_loss

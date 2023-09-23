@@ -81,7 +81,6 @@ if __name__ == "__main__":
     plt.legend()
     plt.show()
 
-    a = 0
     carbodyvertacc1 = np.hstack((carbodyvertacc11, carbodyvertacc12))
     carbodyvertacc2 = np.hstack((carbodyvertacc21, carbodyvertacc22))
     road12 = np.hstack((roadvertheights[1][0::timesteps_skip], roadvertheights[2][0::timesteps_skip]))
@@ -96,17 +95,49 @@ if __name__ == "__main__":
 
     eq_l = EqualizerLearner(x1=carbodyvertacc1,
                             x2=carbodyvertacc2, batch_length_s=1.0,
-                            y1=road12,
-                            time=time_road12, learning_rate=0.0001, epochs=50)  # x_car
+                            y=road12, amplitude_regularization=1000.0,
+                            time=time_road12, learning_rate=0.0005, epochs=50)  # x_car
+    eq_l.build_model()
+    eq_l.fit_model()
 
-    # Create a figure and axis
-    fig, ax = plt.subplots(1, 2)
-    # Display the matrix with colors
-    ca_ = ax[0].imshow(np.abs(eq_l.x1_train_fd), aspect='auto', cmap='viridis')
-    cax = ax[1].imshow(np.abs(eq_l.x2_train_fd), aspect='auto', cmap='viridis')
-    # Add color bar
-    cbar = fig.colorbar(cax)
+    # kernels
+    plt.figure()
+    plt.title('equalizers')
+    plt.plot(eq_l.freq, eq_l.model.weights[0], label='for car1')
+    plt.plot(eq_l.freq, eq_l.model.weights[1], label='for car2')
+    plt.xlabel('frequency (Hz)')
+    plt.legend()
 
+    # Spectrograms
+    f = np.linspace(1, 49, 49)  # Valores de x de 1 a 49 # Crear una matriz que represente la hiperbola y = 1/x
+    diff_fd = f**2
+    acc_spectrogram_road = eq_l.y_train_fd * diff_fd
+    acc_spectrogram_road_log = np.log(acc_spectrogram_road)
+    vmin, vmax = np.min(acc_spectrogram_road_log), np.max(acc_spectrogram_road_log)
+    fig_road = plt.figure()
+    cax_road = plt.imshow(acc_spectrogram_road_log, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    cbar_road = fig_road.colorbar(cax_road)
+    plt.title('acc. spectrogram of the actual road')
+
+    acc_car1_log, acc_car2_log = np.log(eq_l.x1_train_fd), np.log(eq_l.x2_train_fd)
+    vmin, vmax = np.min(np.min((acc_car1_log, acc_car2_log))), np.max(np.max((acc_car1_log, acc_car2_log)))
+    fig_, ax = plt.subplots(1, 2)
+    ax[0].imshow(acc_car1_log, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0].set_title('acc. at car 1')
+    ax[1].imshow(acc_car2_log, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1].set_title('acc. at car 2')
+
+    # Plot prediction
+    y_pred_log = np.log(eq_l.predict())
+    fig_, ax = plt.subplots(1, 2)
+    vmin, vmax = np.min(np.min(y_pred_log)), np.max(np.max(y_pred_log))
+    ax[0].imshow(y_pred_log[0], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0].set_title('equalized acc. at car 1')
+    ax[1].imshow(y_pred_log[1], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1].set_title('equalized acc. at car 2')
+    plt.show()
+
+    a = 0
     # # Inverse identification of cars knowing the road
     # _, carbodyvertacc1, _, _ = \
     #     modelsol2meas(models[1][1], roadvertaccs[0], roadvertheights[0], timesteps_skip=timesteps_skip)
