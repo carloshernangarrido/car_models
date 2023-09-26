@@ -16,15 +16,18 @@ from predictive_models.custom_layers import DiagonalDense
 
 class EqualizerLearner:
     def __init__(self, x1, x2, time, y,
-                 kernel_length_s: float = 5.0, batch_length_s: float = 10, learning_rate=0.001, epochs: int = 10,
+                 kernel_length_s: float = 5.0, batch_length_s: float = 10,
+                 polynomial_kernel_degree: Union[None, int] = None, learning_rate=0.001, epochs: int = 10,
                  amplitude_regularization: float = 1.0):
         """
-        Unsupervised learner of equalizers, assuming x1 and x2 are outputs of filters excited by a common source.
+            Unsupervised learner of equalizers, assuming x1 and x2 are outputs of filters excited by a common source.
         :param x1:
         :param x2:
         :param time:
+        :param y:
         :param kernel_length_s:
         :param batch_length_s:
+        :param polynomial_kernel_degree:
         :param learning_rate:
         :param epochs:
         :param amplitude_regularization:
@@ -37,6 +40,7 @@ class EqualizerLearner:
         self.x2 = x2
         self.time = time
         self.kernel_length_s = kernel_length_s
+        self.polynomial_kernel_degree = polynomial_kernel_degree
         self.batch_length_s = batch_length_s
         self.delta_t = time[1] - time[0]
         self.kernel_size = int(kernel_length_s / self.delta_t)
@@ -67,8 +71,9 @@ class EqualizerLearner:
         input2 = Input(shape=self.input_shape)
 
         # Apply shared Conv1D layers to each element of the input tensor
-        diag1 = DiagonalDense(units=self.input_shape[0], kernel_initializer='ones')(input1)
-        diag2 = DiagonalDense(units=self.input_shape[0], kernel_initializer='ones')(input2)
+        deg = self.polynomial_kernel_degree
+        diag1 = DiagonalDense(units=self.input_shape[0], kernel_initializer='ones', polynomial_kernel_degree=deg)(input1)
+        diag2 = DiagonalDense(units=self.input_shape[0], kernel_initializer='ones', polynomial_kernel_degree=deg)(input2)
 
         # Create the model
         model = tf.keras.models.Model(inputs=[input1, input2],
@@ -90,3 +95,14 @@ class EqualizerLearner:
 
     def predict(self):
         return self.model.predict([self.x1_train_fd, self.x1_train_fd])
+
+
+class SpeedInformedEqualizerLearner(EqualizerLearner):
+    def __init__(self, x1, x2, time, y,
+                 kernel_length_s: float = 5.0, batch_length_s: float = 10,
+                 polynomial_kernel_degree: Union[None, int] = None, learning_rate=0.001, epochs: int = 10,
+                 amplitude_regularization: float = 1.0):
+        super().__init__(x1, x2, time, y,
+                         kernel_length_s, batch_length_s,
+                         polynomial_kernel_degree, learning_rate, epochs,
+                         amplitude_regularization)

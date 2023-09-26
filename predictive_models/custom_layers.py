@@ -48,7 +48,7 @@ class SOSConv1D(tf.keras.layers.Layer):
                                          trainable=True, constraint=amplitude_constraint)
 
         # generated kernel
-        self.kernel = self.add_weight(name='kernel', shape=(self.kernel_size, ), initializer='ones',
+        self.kernel = self.add_weight(name='kernel', shape=(self.kernel_size,), initializer='ones',
                                       dtype='float32', trainable=False)
         if self.use_bias:
             self.bias = self.add_weight(name='bias', shape=(1,), initializer='zeros', dtype='float32', trainable=True)
@@ -57,8 +57,10 @@ class SOSConv1D(tf.keras.layers.Layer):
         if kwargs['training'] is True:  # Training mode
             ...
         kernel = tf.reshape(self.amplitude, (-1, 1)) \
-                  * tf.math.cos(tf.reshape(self.omega, (-1, 1)) * tf.reshape(self.t, (1, -1)) + tf.reshape(self.phi, (-1, 1))) \
-                  * tf.math.exp(tf.reshape(-self.zeta, (-1, 1)) * tf.reshape(self.omega, (-1, 1)) * tf.reshape(self.t, (1, -1)))
+                 * tf.math.cos(
+            tf.reshape(self.omega, (-1, 1)) * tf.reshape(self.t, (1, -1)) + tf.reshape(self.phi, (-1, 1))) \
+                 * tf.math.exp(
+            tf.reshape(-self.zeta, (-1, 1)) * tf.reshape(self.omega, (-1, 1)) * tf.reshape(self.t, (1, -1)))
         kernel = tf.reduce_sum(kernel, axis=0)
 
         self.kernel.assign(kernel)
@@ -74,19 +76,46 @@ class SOSConv1D(tf.keras.layers.Layer):
 
 
 class DiagonalDense(tf.keras.layers.Layer):
-    def __init__(self, units, kernel_initializer, **kwargs):
+    def __init__(self, units, kernel_initializer, polynomial_kernel_degree: Union[None, int] = None, **kwargs):
+        if polynomial_kernel_degree is not None:
+            assert isinstance(polynomial_kernel_degree, int)
+            assert polynomial_kernel_degree < units
+        self.polynomial_kernel_degree = polynomial_kernel_degree
         self.kernel_initializer = kernel_initializer
         self.kernel = None
+        self.kernel_coef = None
+        self.kernel_basis = None
         self.units = units
         super(DiagonalDense, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        # Create a diagonal weight matrix with ones on the diagonal
-        self.kernel = self.add_weight("kernel", shape=(self.units, ), initializer=self.kernel_initializer, trainable=True,
-                                      constraint=tf.keras.constraints.NonNeg())
+        if self.polynomial_kernel_degree is None:
+            self.kernel = self.add_weight("kernel", shape=(self.units,), initializer=self.kernel_initializer,
+                                          trainable=True, constraint=tf.keras.constraints.NonNeg())
+        else:
+            self.kernel_coef = self.add_weight("kernel_coef", shape=(self.polynomial_kernel_degree, 1),
+                                               initializer=self.kernel_initializer, trainable=True)
+            self.kernel = self.add_weight("kernel", shape=(self.units,), initializer=self.kernel_initializer,
+                                          trainable=False, constraint=tf.keras.constraints.NonNeg())
+            # Define the degree of the Legendre polynomial
+            degree = self.polynomial_kernel_degree  # Replace with your degree value
+            length = self.units
+            domain = (0, length - 1)
+            basis = np.zeros((length, degree))
+            for row in range(length):  # Calculate Legendre polynomials for each row
+                for col in range(degree):
+                    polynomial = np.polynomial.legendre.Legendre.basis(col, domain)
+                    # Evaluate the Legendre polynomial at the desired point (0.0 for Legendre polynomials)
+                    basis[row, col] = polynomial(row)
+            self.kernel_basis = self.add_weight("basis", shape=(length, degree), initializer='ones',
+                                                trainable=False)
+            self.kernel_basis.assign(basis)
 
     def call(self, inputs, **kwargs):
-        # Apply the diagonal weight matrix and ensure the output has the same shape as the input
-        z = self.kernel * inputs
+        if self.polynomial_kernel_degree is None:
+            z = self.kernel * inputs
+        else:
+            kernel = self.kernel_basis @ self.kernel_coef
+            self.kernel.assign(tf.reshape(kernel, (-1,)))
+            z = tf.reshape(kernel, (-1,)) * inputs
         return z
-

@@ -11,14 +11,22 @@ m_u = 80  # Unsprung mass
 
 roaddata_folder = r'C:\TRABAJO\CONICET\datasets\A 3D road surface topography\RoadData'
 speed_descr = SpeedDescriber(t_accel=20, t_const=50, t_decel=10.1, max_speed=20)
+file_ini = 0
 file_qty = 295
 delta_t = 0.001
 timesteps_skip = 10
 
 # roaddata_folder = r'C:\TRABAJO\CONICET\datasets\SimpleSyntheticRoadData'
 # speed_descr = SpeedDescriber(t_accel=1, t_const=19, t_decel=1, max_speed=1)
+# file_ini = 0
 # file_qty = 1
 # delta_t = 0.001
 
+# roaddata_folder = r'C:\TRABAJO\CONICET\datasets\A 3D road surface topography\RoadData'
+# speed_descr = SpeedDescriber(t_accel=1, t_const=40, t_decel=1, max_speed=20)
+# file_ini = 80
+# file_qty = 200
+# delta_t = 0.001
+# timesteps_skip = 10
 
-generate_dataset = False
+generate_dataset = True

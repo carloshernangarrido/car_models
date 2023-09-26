@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 
+from utils.filters import remove_mean_and_scale, frf_filter
+
 
 def modelsol2meas(model, roadvertacc, roadvertheight, timesteps_skip=1):
     wheelvertacc = roadvertacc + model.accelerations(1, append=0)
@@ -148,3 +150,84 @@ def plot_modelresults_timefrequencydomain(t_vector, roadvertheight, roadvertacc,
         plt.show()
     if return_batches:
         return batches
+
+
+def plot_comparison_td(time_road12, road12, carbodyvertacc1, carbodyvertacc2,
+                       carbodyvertacc1_filt, carbodyvertacc2_filt,
+                       int2_acc1, int2_acc2, int2_acc1_filt, int2_acc2_filt):
+    fig, ax = plt.subplots(2, 2, sharex='all')
+    ax[0, 0].set_title('measured car accelerations')
+    ax[0, 0].plot(time_road12, carbodyvertacc1, label='car1')
+    ax[0, 0].plot(time_road12, carbodyvertacc2, label='car2', alpha=0.5)
+    ax[0, 0].plot(time_road12, remove_mean_and_scale(np.diff(np.diff(road12, append=0), append=0),
+                                                     window_length=0, scale=np.max(np.abs(carbodyvertacc1))),
+                  label='road ', color='g')
+    ax[1, 0].set_title('equalized car accelerations')
+    ax[1, 0].plot(time_road12, carbodyvertacc1_filt, label='car1')
+    ax[1, 0].plot(time_road12, carbodyvertacc2_filt, label='car2', alpha=0.5)
+    ax[1, 0].plot(time_road12, remove_mean_and_scale(np.diff(np.diff(road12, append=0), append=0),
+                                                     window_length=0, scale=np.max(np.abs(carbodyvertacc1_filt))),
+                  label='road ', color='g')
+    ax[1, 0].legend()
+    ax[0, 1].set_title('displacements from measured accelerations')
+    ax[0, 1].plot(time_road12, int2_acc1, label='car1')
+    ax[0, 1].plot(time_road12, int2_acc2, label='car2', alpha=0.5)
+    ax[0, 1].plot(time_road12, remove_mean_and_scale(road12, window_length=100, scale=np.max(int2_acc1)),
+                  label='scaled road', color='g')
+    ax[1, 1].set_title('displacements from equalized accelerations')
+    ax[1, 1].plot(time_road12, int2_acc1_filt, label='car1')
+    ax[1, 1].plot(time_road12, int2_acc2_filt, label='car2', alpha=0.5)
+    ax[1, 1].plot(time_road12, remove_mean_and_scale(road12, window_length=100, scale=np.max(int2_acc1_filt)),
+                  label='scaled road', color='g')
+    ax[1, 1].legend()
+
+
+def plot_eq_fd_td_results(eq_l, time_road12=None, carbodyvertacc1=None, carbodyvertacc2=None, road12=None):
+    # kernels
+    fig, ax = plt.subplots(2, 3)
+    ax[1, 0].set_title('equalizers')
+    kernel1 = next((var for var in eq_l.model.layers[2].variables if 'kernel:' in var.name), None)
+    kernel2 = next((var for var in eq_l.model.layers[3].variables if 'kernel:' in var.name), None)
+    ax[1, 0].plot(eq_l.freq, kernel1, label='for car1')
+    ax[1, 0].plot(eq_l.freq, kernel2, label='for car2')
+    ax[1, 0].set_xlabel('frequency (Hz)')
+    ax[1, 0].legend()
+
+    # Spectrograms Linear scale
+    f = np.linspace(1, 49, 49)  # Valores de x de 1 a 49 # Crear una matriz que represente la hiperbola y = 1/x
+    diff_fd = f ** 2
+    acc_spectrogram_road = eq_l.y_train_fd * diff_fd
+    vmin, vmax = np.min(acc_spectrogram_road), np.max(acc_spectrogram_road)
+    ax[0, 0].imshow(acc_spectrogram_road, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    # cbar_road = fig_road.colorbar(cax_road)
+    ax[0, 0].set_title('acc. spectrogram of the actual road')
+    acc_car1, acc_car2 = eq_l.x1_train_fd, eq_l.x2_train_fd
+    vmin, vmax = np.min(np.min((acc_car1, acc_car2))), np.max(np.max((acc_car1, acc_car2)))
+
+    ax[0, 1].imshow(acc_car1, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0, 1].set_title('acc. at car 1')
+    ax[0, 2].imshow(acc_car2, aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0, 2].set_title('acc. at car 2')
+    y_pred = eq_l.predict()
+
+    vmin, vmax = np.min(np.min(y_pred)), np.max(np.max(y_pred))
+    vmax = 80
+    ax[1, 1].imshow(y_pred[0], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1, 1].set_title('equalized acc. at car 1')
+    ax[1, 2].imshow(y_pred[1], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1, 2].set_title('equalized acc. at car 2')
+    plt.show()
+
+    # Plot time domain
+    carbodyvertacc1_filt = frf_filter(time=time_road12, input_=carbodyvertacc1, frf_freqs=eq_l.freq, frf_vals=kernel1)
+    carbodyvertacc2_filt = frf_filter(time=time_road12, input_=carbodyvertacc2, frf_freqs=eq_l.freq, frf_vals=kernel2)
+    frf_int2 = np.zeros_like(eq_l.freq)
+    frf_int2[1:] = 1 / (2 * np.pi * eq_l.freq[1:]) ** 2
+    int2_acc1 = frf_filter(time=time_road12, input_=carbodyvertacc1, frf_freqs=eq_l.freq, frf_vals=frf_int2)
+    int2_acc2 = frf_filter(time=time_road12, input_=carbodyvertacc2, frf_freqs=eq_l.freq, frf_vals=frf_int2)
+    int2_acc1_filt = frf_filter(time=time_road12, input_=carbodyvertacc1_filt, frf_freqs=eq_l.freq, frf_vals=frf_int2)
+    int2_acc2_filt = frf_filter(time=time_road12, input_=carbodyvertacc2_filt, frf_freqs=eq_l.freq, frf_vals=frf_int2)
+    plot_comparison_td(time_road12, road12, carbodyvertacc1, carbodyvertacc2,
+                       carbodyvertacc1_filt, carbodyvertacc2_filt,
+                       int2_acc1, int2_acc2, int2_acc1_filt, int2_acc2_filt)
+    plt.show()
