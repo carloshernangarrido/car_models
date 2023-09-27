@@ -6,12 +6,15 @@ from roadprofile_management.loaders import Road, SpeedDescriber
 
 
 def get_roadvertaccheight(loader: Road, speed_descr: SpeedDescriber, t_vector: np.ndarray, plot: bool = False,
-                          lane=1.0):
+                          lane=1.0, ret_speed_and_pos: bool = False):
     position_height = loader.get_profile(tol=.2, lane=lane, plot=False)
     converter = converters.Converter(position_height, new_t_vector=t_vector)
+    delta_t = t_vector[1] - t_vector[0]
     speed_th = np.array([[0, 0],
                          [speed_descr.t_accel, speed_descr.max_speed],
+                         [speed_descr.t_accel+delta_t, speed_descr.max_speed],
                          [speed_descr.t_start_decel, speed_descr.max_speed],
+                         [speed_descr.t_start_decel+delta_t, speed_descr.max_speed],
                          [speed_descr.T, 0]])
     position_th = converter.speed_th2position_th(speed_th)
     if plot:
@@ -31,4 +34,8 @@ def get_roadvertaccheight(loader: Road, speed_descr: SpeedDescriber, t_vector: n
         ax[1, 1].set_ylabel('height (m)')
         plt.show()
     roadvertacc_th = converter.speed_th2roadvertacc_th(speed_th)
-    return roadvertacc_th[:, 1], converter.speed_th2height_th(speed_th)[:, 1]
+    if ret_speed_and_pos:
+        return roadvertacc_th[:, 1], converter.speed_th2height_th(speed_th)[:, 1], \
+               np.diff(position_th[:, 1])/(t_vector[1] - t_vector[0]), position_th[:, 1]
+    else:
+        return roadvertacc_th[:, 1], converter.speed_th2height_th(speed_th)[:, 1]

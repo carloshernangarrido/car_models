@@ -94,8 +94,8 @@ if __name__ == "__main__":
 
     eq_l = EqualizerLearner(x1=carbodyvertacc1,
                             x2=carbodyvertacc2, batch_length_s=1.0, polynomial_kernel_degree=None,
-                            y=road12, amplitude_regularization=1000.0,
-                            time=time_road12, learning_rate=0.001, epochs=50)  # x_car
+                            y=road12, amplitude_regularization=1000,
+                            time=time_road12, learning_rate=0.0005, epochs=100)  # x_car
     eq_l.build_model()
     eq_l.fit_model()
 

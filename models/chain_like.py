@@ -440,10 +440,10 @@ class Model:
         lin_solu = sp.signal.lsim(self.linear_model['lin_sys'], self.linear_model['u'].T, self.loads[0].t)
 
         class Sol:
-            def __init__(self, lin_solu, model=self):
-                d = (lin_solu[2].T)[0:lin_solu[2].T.shape[0]//2]
-                v = (lin_solu[2].T)[lin_solu[2].T.shape[0]//2:]
-                self.t = lin_solu[0]
+            def __init__(self, lin_solu_, model=self):
+                d = lin_solu_[2].T[0:lin_solu_[2].T.shape[0] // 2]
+                v = lin_solu_[2].T[lin_solu_[2].T.shape[0] // 2:]
+                self.t = lin_solu_[0]
                 self.y = np.zeros((2*model.n_dof, self.t.shape[0]))
                 i = 0
                 for i_dof in range(model.n_dof):

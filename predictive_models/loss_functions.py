@@ -63,9 +63,36 @@ class SameRoadLossCallback(tf.keras.callbacks.Callback):
         # Calculate the loss terms
         shape_loss = tf.reduce_mean(tf.square(y_pred[0] - y_pred[1]))
         amplitude_loss = -tf.reduce_min(y_pred)
+        amplitude_loss_term = self.amplitude_regularization * amplitude_loss
 
         # Calculate the total loss
-        total_loss = shape_loss + self.amplitude_regularization * amplitude_loss
+        total_loss = shape_loss + amplitude_loss_term
 
         # Print the loss terms
-        print(f"Epoch {epoch + 1} - Shape Loss: {shape_loss:.4f}, Amplitude Loss: {amplitude_loss:.4f}, Total Loss: {total_loss:.4f}")
+        print(f"Epoch {epoch + 1} - Shape term: {shape_loss:.4f}, Amplitude term: {amplitude_loss_term:.4f}, "
+              f"Total Loss: {total_loss:.4f}")
+
+
+class InformedSpeedSameRoadLossSimple:
+    def __init__(self, amplitude_regularization: float = 1.0):
+        self.amplitude_regularization = amplitude_regularization
+
+    def __call__(self, y_true, y_pred, *args, **kwargs):
+        """
+        Compute the mean squared difference between the two predicted outputs accounting for the speeds and assuming
+        the same road profile, i.e. the same space history not the same time history
+        :param y_true: Not used. This an unsupervised approach.
+        :param y_pred: It is assumed to be = [diag1, diag2, input_s1, input_s2]
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        diag1, diag2, s1, s2 = y_pred
+        s_min, s_max = min(s1, s2), max(s1, s2)
+        size = diag1.shape[0]
+        diag1_resized = tf.reshape(tf.image.resize(diag1[0:int((s1/s_max)*size)].reshape((-1, 1, 1)), (size, 1)), (-1,))
+        diag2_resized = tf.reshape(tf.image.resize(diag2[0:int((s2/s_max)*size)].reshape((-1, 1, 1)), (size, 1)), (-1,))
+
+        shape_loss = tf.reduce_mean(tf.square(diag1_resized - diag2_resized))
+        amplitude_loss = -tf.reduce_min(y_pred)
+        return shape_loss + self.amplitude_regularization * amplitude_loss

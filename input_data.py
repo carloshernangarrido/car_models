@@ -29,4 +29,4 @@ timesteps_skip = 10
 # delta_t = 0.001
 # timesteps_skip = 10
 
-generate_dataset = True
+generate_dataset = False
