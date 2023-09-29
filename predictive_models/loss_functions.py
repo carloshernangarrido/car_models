@@ -95,9 +95,10 @@ class InformedSpeedSameRoadLossSimple:
         size = diag1.shape[0]
 
         size_s1_smax = tf.squeeze((tf.cast(size * s1 / s_max, dtype=tf.int32)))
+        size_s2_smax = tf.squeeze((tf.cast(size * s2 / s_max, dtype=tf.int32)))
 
         diag1_resized = tf.reshape(tf.image.resize(tf.reshape(diag1[0:size_s1_smax], (-1, 1, 1)), (size, 1)), (-1,))
-        diag2_resized = tf.reshape(tf.image.resize(tf.reshape(diag2[0:size_s1_smax], (-1, 1, 1)), (size, 1)), (-1,))
+        diag2_resized = tf.reshape(tf.image.resize(tf.reshape(diag2[0:size_s2_smax], (-1, 1, 1)), (size, 1)), (-1,))
 
         shape_loss = tf.reduce_mean(tf.square(diag1_resized - diag2_resized))
         amplitude_loss = -tf.reduce_min(y_pred)
