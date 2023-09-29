@@ -5,7 +5,7 @@ from copy import copy
 import matplotlib.pyplot as plt
 import numpy as np
 
-from predictive_models.frequency_domain import EqualizerLearner
+from predictive_models.frequency_domain import EqualizerLearner, SpeedInformedEqualizerLearner
 from predictive_models.system_identification import CarDynamicsIdentification, JointIdentification, \
     JointIdentificationSimple
 from roadprofile_management import loaders
@@ -13,7 +13,8 @@ from roadprofile_management.utils import get_roadvertaccheight
 from models.chain_like import Mesh, Constraint, Model, Load
 from utils.filters import remove_mean_and_scale, frf_filter
 from visualization.ploting_results import plot_modelresults_timedomain, plot_modelresults_frequencydomain, \
-    plot_modelresults_timefrequencydomain, modelsol2meas, plot_comparison_td, plot_eq_fd_td_results
+    plot_modelresults_timefrequencydomain, modelsol2meas, plot_comparison_td, \
+    plot_eq_fd_td_results, plot_sieq_fd_td_results
 
 
 if __name__ == "__main__":
@@ -21,11 +22,9 @@ if __name__ == "__main__":
         delta_t, file_qty, file_ini, timesteps_skip, generate_dataset
 
     if generate_dataset:
-        dataset = {
-            'times': [], 'roadvertaccs': [], 'roadvertheights': [], 'carbodyvertaccs': [], 'car_models': [],
-            'speeds': [], 'positions': []
-        }
-        for m_s_var in [1.0, 0.5]:
+        dataset = {'times': [], 'roadvertaccs': [], 'roadvertheights': [], 'carbodyvertaccs': [], 'car_models': [],
+                   'speeds': [], 'positions': []}
+        for m_s_var in [1.0, 1.00]:
             # Road excitation preparing
             speed_describer = speed_describers.pop()
             t_vector = np.arange(0, speed_describer.T, delta_t)
@@ -84,6 +83,13 @@ if __name__ == "__main__":
                                           s1=dataset['speeds'][0], s2=dataset['speeds'][1],
                                           p1=dataset['positions'][0], p2=dataset['positions'][1],
                                           t1=dataset['times'][0], t2=dataset['times'][1],
-                                          batch_length_s=2.0, polynomial_kernel_degree=None,
-                                          amplitude_regularization=1000.0, learning_rate=0.001, epochs=50)
+                                          road1=dataset['roadvertheights'][0],
+                                          batch_length_s=1.0, polynomial_kernel_degree=None,
+                                          amplitude_regularization=1000.0, learning_rate=0.0001, epochs=50,
+                                          train_batch_size=10)
+    sieql.build_model()
+    sieql.fit_model()
+    sieql.predict()
+    plot_sieq_fd_td_results(sieql=sieql, fvalid=25)
+
     a = 0

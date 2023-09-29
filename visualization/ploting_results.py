@@ -231,3 +231,67 @@ def plot_eq_fd_td_results(eq_l, time_road12=None, carbodyvertacc1=None, carbodyv
                        carbodyvertacc1_filt, carbodyvertacc2_filt,
                        int2_acc1, int2_acc2, int2_acc1_filt, int2_acc2_filt)
     plt.show()
+
+
+def plot_sieq_fd_td_results(sieql, fvalid):
+    # kernels
+    fig, ax = plt.subplots(2, 3, sharex='all')
+    ax[1, 0].set_title('equalizers')
+    kernel1 = next((var for var in sieql.model.layers[2].variables if 'kernel:' in var.name), None)
+    kernel2 = next((var for var in sieql.model.layers[3].variables if 'kernel:' in var.name), None)
+    ax[1, 0].plot(sieql.freq, kernel1, label='for car1')
+    ax[1, 0].plot(sieql.freq, kernel2, label='for car2')
+    ax[1, 0].set_xlabel('frequency (Hz)')
+    ax[1, 0].legend()
+    i_fvalid = np.argmin(np.abs(fvalid - sieql.freq))
+
+    # Spectrograms Linear scale
+    tmax = np.max((sieql.t1[-1], sieql.t2[-1]))
+    f = np.linspace(1, kernel1.shape[0], kernel1.shape[0])  # Valores de x de 1 a 49 # Crear una matriz que represente la hiperbola y = 1/x
+    diff_fd = f ** 2
+    acc_spectrogram_road = sieql.road1_fd * diff_fd
+    vmin, vmax = np.min(acc_spectrogram_road[:, 0:i_fvalid]), np.max(acc_spectrogram_road[:, 0:i_fvalid])
+    ax[0, 0].imshow(acc_spectrogram_road, extent=[0, sieql.freq[-1], 0, sieql.t1[-1]], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[0, 0].set_ylim([0, tmax])
+    ax[0, 0].set_ylabel('time (s)')
+    # cbar_road = fig_road.colorbar(cax_road)
+    ax[0, 0].set_title('acc. spectrogram of the actual road')
+
+    acc_car1, acc_car2 = sieql.x1_train_fd, sieql.x2_train_fd
+    vmin, vmax = np.min((np.min(acc_car1[:, 0:i_fvalid]), np.min(acc_car2[:, 0:i_fvalid]))), \
+                 np.max((np.max(acc_car1[:, 0:i_fvalid]), np.max(acc_car2[:, 0:i_fvalid])))
+    ax[0, 1].imshow(acc_car1, extent=[0, sieql.freq[-1], 0, sieql.t1[-1]], aspect='auto', cmap='viridis',
+                    vmin=vmin, vmax=vmax)
+    ax[0, 1].set_ylim([0, tmax])
+    ax[0, 1].set_title('acc. at car 1')
+    ax[0, 2].imshow(acc_car2, extent=[0, sieql.freq[-1], 0, sieql.t2[-1]], aspect='auto', cmap='viridis',
+                    vmin=vmin, vmax=vmax)
+    ax[0, 2].set_ylim([0, tmax])
+    ax[0, 2].set_title('acc. at car 2')
+
+    if sieql.y1_pred is None:
+        sieql.predict()
+    vmin, vmax = np.min((np.min(sieql.y1_pred[:, 0:i_fvalid]), np.min(sieql.y1_pred[:, 0:i_fvalid]))), \
+                 np.max((np.max(sieql.y1_pred[:, 0:i_fvalid]), np.max(sieql.y1_pred[:, 0:i_fvalid])))
+    ax[1, 1].imshow(sieql.y1_pred, extent=[0, sieql.freq[-1], 0, sieql.t1[-1]], aspect='auto', cmap='viridis',
+                    vmin=vmin, vmax=vmax)
+    ax[1, 1].set_ylim([0, tmax])
+    ax[1, 1].set_title('equalized acc. at car 1')
+    ax[1, 2].imshow(sieql.y2_pred, extent=[0, sieql.freq[-1], 0, sieql.t2[-1]], aspect='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+    ax[1, 2].set_ylim([0, tmax])
+    ax[1, 2].set_title('equalized acc. at car 2')
+    plt.show()
+
+    # # Plot time domain
+    # carbodyvertacc1_filt = frf_filter(time=time_road, input_=carbodyvertacc1, frf_freqs=sieql.freq, frf_vals=kernel1)
+    # carbodyvertacc2_filt = frf_filter(time=time_road, input_=carbodyvertacc2, frf_freqs=sieql.freq, frf_vals=kernel2)
+    # frf_int2 = np.zeros_like(sieql.freq)
+    # frf_int2[1:] = 1 / (2 * np.pi * sieql.freq[1:]) ** 2
+    # int2_acc1 = frf_filter(time=time_road, input_=carbodyvertacc1, frf_freqs=sieql.freq, frf_vals=frf_int2)
+    # int2_acc2 = frf_filter(time=time_road, input_=carbodyvertacc2, frf_freqs=sieql.freq, frf_vals=frf_int2)
+    # int2_acc1_filt = frf_filter(time=time_road, input_=carbodyvertacc1_filt, frf_freqs=sieql.freq, frf_vals=frf_int2)
+    # int2_acc2_filt = frf_filter(time=time_road, input_=carbodyvertacc2_filt, frf_freqs=sieql.freq, frf_vals=frf_int2)
+    # plot_comparison_td(time_road, road, carbodyvertacc1, carbodyvertacc2,
+    #                    carbodyvertacc1_filt, carbodyvertacc2_filt,
+    #                    int2_acc1, int2_acc2, int2_acc1_filt, int2_acc2_filt)
+    plt.show()

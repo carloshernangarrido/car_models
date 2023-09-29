@@ -87,12 +87,19 @@ class InformedSpeedSameRoadLossSimple:
         :param kwargs:
         :return:
         """
-        diag1, diag2, s1, s2 = y_pred
-        s_min, s_max = min(s1, s2), max(s1, s2)
+        diag1 = y_pred[0]
+        diag2 = y_pred[1]
+        s1 = y_true[0]
+        s2 = y_true[1]
+        s_max = tf.reduce_max([s1, s2])
         size = diag1.shape[0]
-        diag1_resized = tf.reshape(tf.image.resize(diag1[0:int((s1/s_max)*size)].reshape((-1, 1, 1)), (size, 1)), (-1,))
-        diag2_resized = tf.reshape(tf.image.resize(diag2[0:int((s2/s_max)*size)].reshape((-1, 1, 1)), (size, 1)), (-1,))
+
+        size_s1_smax = tf.squeeze((tf.cast(size * s1 / s_max, dtype=tf.int32)))
+
+        diag1_resized = tf.reshape(tf.image.resize(tf.reshape(diag1[0:size_s1_smax], (-1, 1, 1)), (size, 1)), (-1,))
+        diag2_resized = tf.reshape(tf.image.resize(tf.reshape(diag2[0:size_s1_smax], (-1, 1, 1)), (size, 1)), (-1,))
 
         shape_loss = tf.reduce_mean(tf.square(diag1_resized - diag2_resized))
         amplitude_loss = -tf.reduce_min(y_pred)
-        return shape_loss + self.amplitude_regularization * amplitude_loss
+        amplitude_loss_term = self.amplitude_regularization * amplitude_loss
+        return shape_loss + amplitude_loss_term
