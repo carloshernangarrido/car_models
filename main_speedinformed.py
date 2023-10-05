@@ -84,7 +84,7 @@ if __name__ == "__main__":
                                           p1=dataset['positions'][0], p2=dataset['positions'][1],
                                           t1=dataset['times'][0], t2=dataset['times'][1],
                                           road1=dataset['roadvertheights'][0],
-                                          batch_length_s=10.0, polynomial_kernel_degree=None,
+                                          batch_length_s=2.0, polynomial_kernel_degree=None,
                                           amplitude_regularization=1000.0, learning_rate=0.0001, epochs=50,
                                           train_batch_size=10)
     sieql.build_model()
